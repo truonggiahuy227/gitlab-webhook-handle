@@ -53,6 +53,7 @@ def webhook():
         payload = request.json
         # print(payload['object_kind'])
         event_queue.put_nowait(payload)
+        print(payload['labels'][0])
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
                             payload['object_attributes']['severity'], payload['changes'], payload['assignees'])
         event.append(json.dumps(eventObject.__dict__))
