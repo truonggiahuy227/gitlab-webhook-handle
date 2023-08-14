@@ -22,14 +22,13 @@ def handle_issue_event():
     print(item['object_kind'])
 
 class EventObject:
-    def __init__(self, event_type, user_create, project_id, project_name, project_url, state, action, severity, changes, assignees):
+    def __init__(self, event_type, user_create, project_id, project_name, project_url, state, severity, changes, assignees):
         self.event_type = event_type
         self.user_create = user_create
         self.project_id = project_id
         self.project_name = project_name
         self.project_url = project_url
         self.state = state
-        self.action = action
         self.severity = severity
         self.changes = changes
         self.assignees = assignees
@@ -53,7 +52,7 @@ def webhook():
         # print(payload['object_kind'])
         event_queue.put_nowait(payload)
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
-                            payload['object_attributes']['action'], payload['object_attributes']['severity'], payload['changes'], payload['assignees'])
+                            payload['object_attributes']['severity'], payload['changes'], payload['assignees'])
         event.append(json.dumps(eventObject.__dict__))
         return 'success', 200
     else:
