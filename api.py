@@ -1,4 +1,4 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify
 import os
 from multiprocessing import Queue
 # from jira import JIRA
@@ -43,7 +43,7 @@ class EventObject:
 def home_page():
     if request.method == 'GET':
         print("Main page \n")
-        return event, 200
+        return jsonify(event), 200
     else:
         abort(400)
 
