@@ -3,6 +3,8 @@ import os
 from multiprocessing import Queue
 # from jira import JIRA
 import json
+from waitress import serve
+
 
 
 # JIRA_SERVER = "https://issues.your-company.com/"
@@ -60,4 +62,4 @@ def webhook():
 
 if __name__ == '__main__':
     #handle_issue_event()
-    app.run(host='0.0.0.0', port=8080)
+    serve(app, host="0.0.0.0", port=8080)
