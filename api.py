@@ -56,7 +56,7 @@ def webhook():
         if payload['labels']:
             print('label: ' + payload['labels'][0]['title'] + ', state: ' + payload['object_attributes']['state'])
         else:
-            print(payload['object_attributes']['state'])
+            print('state: ' + payload['object_attributes']['state'])
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
                             payload['object_attributes']['severity'], payload['changes'], payload['assignees'])
         event.append(json.dumps(eventObject.__dict__))
