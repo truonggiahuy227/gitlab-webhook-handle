@@ -54,7 +54,7 @@ def webhook():
         # print(payload['object_kind'])
         event_queue.put_nowait(payload)
         if payload['labels']:
-            print(payload['labels'][0])
+            print('label: ' + payload['labels'][0]['title'] + ', state: ' + payload['object_attributes']['state'])
         else:
             print(payload['object_attributes']['state'])
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
