@@ -1,15 +1,17 @@
 from flask import Flask, request, abort, jsonify
 import os
 from multiprocessing import Queue
-# from jira import JIRA
+from jira import JIRA
 import json
 from waitress import serve
 
 
 
 # JIRA_SERVER = "https://issues.your-company.com/"
-# jira_user_name = os.environ.get('JIRA_USERNAME')
-# jira_password = os.environ.get('JIRA_PASSWORD')
+jira_user_name = os.environ.get('JIRA_USERNAME')
+jira_password = os.environ.get('JIRA_PASSWORD')
+jira_server = os.environ.get('JIRA_SERVER')
+jira_proj = os.environ.get('JIRA_PROJECT')
 # jira_connection = JIRA(basic_auth=(jira_user_name, jira_password), 
 # server=JIRA_SERVER)
 # jira_connection.transition_issue("PR-1309", "Start Progress")
@@ -17,11 +19,23 @@ from waitress import serve
 event_queue = Queue()
 event = []
 app = Flask(__name__)
+jira = JIRA(server=jira_server)
+auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
 ## Function part
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
+
+def createTask(summary):
+    issue_dict = {
+        'project': {'key': jira_proj},
+        'summary': summary,
+        'description': "test",
+        'issuetype': {'name': 'Task'},
+    }
+    new_issue = jira.create_issue(fields=issue_dict)
+    return new_issue
 
 class EventObject:
     def __init__(self, event_type, user_create, project_id, project_name, project_url, state, severity, changes, assignees):
@@ -34,6 +48,8 @@ class EventObject:
         self.severity = severity
         self.changes = changes
         self.assignees = assignees
+
+
             
         
 
@@ -57,6 +73,8 @@ def webhook():
             print('issue name: ' + payload['object_attributes']['title'] + ', label: ' + payload['labels'][0]['title'] + ', state: ' + payload['object_attributes']['state'])
         else:
             print('issue name: ' + payload['object_attributes']['title'] + ', state: ' + payload['object_attributes']['state'])
+            if payload['object_attributes']['state'] == 'opened':
+                createTask(payload['object_attributes']['title'])
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
                             payload['object_attributes']['severity'], payload['changes'], payload['assignees'])
         event.append(json.dumps(eventObject.__dict__))
