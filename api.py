@@ -84,4 +84,5 @@ def webhook():
 
 if __name__ == '__main__':
     #handle_issue_event()
+    print('------Start server------')
     serve(app, host="0.0.0.0", port=8080)
