@@ -19,7 +19,6 @@ jira_proj = os.environ.get('JIRA_PROJECT')
 event_queue = Queue()
 event = []
 app = Flask(__name__)
-jira = JIRA(server=jira_server)
 auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
 ## Function part
@@ -34,7 +33,7 @@ def createTask(summary):
         'description': "test",
         'issuetype': {'name': 'Task'},
     }
-    new_issue = jira.create_issue(fields=issue_dict)
+    new_issue = auth_jira.create_issue(fields=issue_dict)
     return new_issue
 
 class EventObject:
