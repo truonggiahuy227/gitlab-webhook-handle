@@ -1,9 +1,12 @@
 from flask import Flask, request, abort, jsonify
+import logging
 import os
 from multiprocessing import Queue
 from jira import JIRA
 import json
 from waitress import serve
+from datetime import date
+import calendar
 
 
 jira_user_name = os.environ.get('JIRA_USERNAME')
@@ -11,16 +14,40 @@ jira_password = os.environ.get('JIRA_PASSWORD')
 jira_server = os.environ.get('JIRA_SERVER')
 jira_proj = os.environ.get('JIRA_PROJECT')
 
+
+log = logging.getLogger(__name__) 
+if any(v in (None, '') for v in[jira_user_name, jira_password, jira_server, jira_proj]):
+    log.error("Environment Variables not passed incorrectly")
+    raise SystemExit(1)
+
 event_queue = Queue()
 event = []
 app = Flask(__name__)
 auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
-from datetime import date
 
 ## Function part
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
+
+def getLastDayOfMonth(startDate):
+    start = startDate.split('-')
+    date1 = date(int(start[0]), int(start[1]), int(start[2]))
+    res = calendar.monthrange(date1.year, date1.month)
+    day = res[1]
+    return str(date1.year) + '-' + str(date1.month) + '-' + str(day)
+
+def convert(seconds):
+    min, sec = divmod(seconds, 60)
+    hour, min = divmod(min, 60)
+    day = hour // 8
+    if day > 0:
+        return str(day) + 'd'
+    if hour > 0:
+        return str(hour) + 'h'
+    if min > 0:
+        return str(min) + 'm'
+
 
 def calculateDate(startDate, dueDate):
     start = startDate.split('-')
@@ -30,6 +57,13 @@ def calculateDate(startDate, dueDate):
     day = (date2-date1).days
     estimate = str(day) + 'd'
     return estimate
+
+def checkTransition(task, id):
+    transitions = auth_jira.transitions(task)
+    for trans in transitions:
+        if trans['id'] == id:
+            return True
+    return False
 
 def createTask(summary, startDate, dueDate):
 
@@ -48,6 +82,80 @@ def createTask(summary, startDate, dueDate):
     }
     new_issue = auth_jira.create_issue(fields=issue_dict)
     return new_issue
+
+def changeAssignee(issue_name, assignee):
+    issue = auth_jira.issue(issue_name)
+    auth_jira.assign_issue(issue, assignee)
+
+def changeStatus(task, transition_id):
+    if checkTransition(task, transition_id):  
+        auth_jira.transition_issue(task, transition_id)
+    else:
+        print('Invalid trasition')
+
+
+def detectChange(payload):
+    ## Assign task to user
+    if payload['object_attributes']['action'] == 'open':
+        ## Create new Task
+        #print('issue name: ' + payload['object_attributes']['title'] + ', state: ' + payload['object_attributes']['state'])
+        print("Create new Task on Jira")
+        startDateString = payload['object_attributes']['created_at'].split(' ')
+        startDate = startDateString[0]
+        dueDate = getLastDayOfMonth(startDate)
+        createTask(payload['object_attributes']['title'], startDate, dueDate)
+        return
+    if payload['object_attributes']['action'] == 'update':
+        task = auth_jira.search_issues('summary~\"'  + payload['object_attributes']['title'] + '\"')[0]
+        #print('summary~\"'  + payload['object_attributes']['title'] + '\"')
+        if "due_date" in payload['changes']:
+            print('Update due date')
+            startDateString = payload['object_attributes']['created_at'].split(' ')
+            startDate = startDateString[0]
+            task.update(
+                duedate=payload['changes']['due_date']['current']
+            )
+            return
+        if 'assignees' in payload['changes']:
+            print('Update assignee')
+            new_assignee = payload['changes']['assignees']['current'][0]['username']
+            if payload['changes']['assignees']['previous']:
+                print('Change assignee in Task from assignee ' + payload['changes']['assignees']['previous'][0]['username'] + ' to new assignee ' + new_assignee)
+            else:
+                print('Assign Task ' + payload['object_attributes']['title'] + ' to assignee ' + new_assignee)
+            changeAssignee(task, 'tungpt18' )
+            return
+        if 'time_estimate' in payload['changes']:
+            print('Update estimate')
+            estimate = convert(int(payload['changes']['time_estimate']['current']))
+            print(estimate)
+            task.update(
+                customfield_10306=estimate
+            )
+            return
+        ## Update status
+        if 'labels' in payload['changes']:
+            print('Change status:')
+            if payload['changes']['labels']['current']:
+                new_label = payload['changes']['labels']['current'][0]['title']
+                task.update(fields={"labels": [new_label]})
+                if new_label in ['Status_Doing', 'Status_Testing']:
+                    changeStatus(task, '11')
+                elif new_label in ['Status_Done-dev', 'Status_Done']:
+                    changeStatus(task, '21')
+                elif new_label == 'Status_Canceled':
+                    changeStatus(task, '51')
+                elif new_label == 'Status_Resolved':
+                    changeStatus(task, '31')
+            else:
+                if payload['changes']['labels']['previous']:
+                    print('Reopen')
+                    task.update(fields={"labels": ['Status_Reopen']})
+                    changeStatus(task, '71')
+        return
+    
+    return
+
 
 class EventObject:
     def __init__(self, event_type, user_create, project_id, project_name, project_url, state, severity, changes):
@@ -82,14 +190,9 @@ def webhook():
         payload = request.json
         # print(payload['object_kind'])
         event_queue.put_nowait(payload)
-        if payload['labels']:
-            print('issue name: ' + payload['object_attributes']['title'] + ', label: ' + payload['labels'][0]['title'] + ', state: ' + payload['object_attributes']['state'])
-        else:
-            print('issue name: ' + payload['object_attributes']['title'] + ', state: ' + payload['object_attributes']['state'])
-            if payload['object_attributes']['state'] == 'opened':
-                startDateString = payload['object_attributes']['created_at'].split(' ')
-                startDate = startDateString[0]
-                createTask(payload['object_attributes']['title'], startDate, payload['object_attributes']['due_date'])
+        print('<-------------------------------------------->')
+        detectChange(payload)
+        print('<-------------------------------------------->')
         eventObject = EventObject(payload['event_type'], payload['user'], payload['project']['id'], payload['project']['name'], payload['project']['web_url'], payload['object_attributes']['state'],
                             payload['object_attributes']['severity'], payload['changes'])
         event.append(json.dumps(eventObject.__dict__))
@@ -98,6 +201,5 @@ def webhook():
         abort(400)
 
 if __name__ == '__main__':
-    #handle_issue_event()
     print('------Start server------')
     serve(app, host="0.0.0.0", port=8080)
