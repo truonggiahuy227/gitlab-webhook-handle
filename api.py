@@ -14,6 +14,19 @@ jira_user_name = os.environ.get('JIRA_USERNAME')
 jira_password = os.environ.get('JIRA_PASSWORD')
 jira_server = os.environ.get('JIRA_SERVER')
 jira_proj = os.environ.get('JIRA_PROJECT')
+jira_status_prefix = os.environ.get('STATUS_PREFIX')
+jira_component_prefix = os.environ.get('COMPONENT_PREFIX')
+jira_workarround_enable = True
+
+
+inprogress = '11'
+complete = '21'
+resolve = '31'
+cancel = '51'
+reopen = '71'
+
+# inprogress_labels = []
+
 
 
 log = logging.getLogger(__name__) 
@@ -67,6 +80,8 @@ def checkTransition(task, id):
     return False
 
 def createDefaultTask(summary, startDate, dueDate):
+    jra = auth_jira.project(jira_proj)
+    components = auth_jira.project_components(jra)
 
     estimate = calculateDate(startDate, dueDate)
     issue_dict = {
@@ -75,7 +90,7 @@ def createDefaultTask(summary, startDate, dueDate):
         'description': "",
         'issuetype': {'name': 'Task'},
         'components': [{
-            "name" :"Front-end"
+            "name" : components[0].name
             }],
         'customfield_10306': estimate,
         'duedate': dueDate,
@@ -85,6 +100,10 @@ def createDefaultTask(summary, startDate, dueDate):
     return task
 
 def createTask(payload):
+    jra = auth_jira.project(jira_proj)
+    components = auth_jira.project_components(jra)
+
+
     task_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
     description = payload['object_attributes']['description'] if payload['object_attributes']['description'] else ''
     estimate = convert(payload['object_attributes']['time_estimate']) if payload['object_attributes']['time_estimate'] > 0 else '1d'
@@ -99,7 +118,7 @@ def createTask(payload):
         'description': description,
         'issuetype': {'name': 'Task'},
         'components': [{
-            "name" :"Front-end"
+            "name" : components[0].name
             }],
         'customfield_10306': estimate,
         'duedate': dueDate,
@@ -122,6 +141,23 @@ def changeStatus(task, transition_id):
     else:
         print('Invalid trasition')
 
+def mapTaskLabel(task, payload):
+    if payload['changes']['labels']['current']:
+        new_label = payload['changes']['labels']['current'][0]['title']
+        task.update(fields={"labels": [new_label]})
+    if new_label in ['Status_Doing', 'Status_Testing']:
+        changeStatus(task, inprogress)
+    elif new_label in ['Status_Done']:
+        changeStatus(task, complete)
+    elif new_label == 'Status_Canceled':
+        changeStatus(task, cancel)
+    elif new_label == 'Status_Resolved':
+        changeStatus(task, resolve)
+    else:
+        if payload['changes']['labels']['previous']:
+            print('Reopen')
+            task.update(fields={"labels": ['Status_Reopen']})
+            changeStatus(task, reopen)
 
 def detectChange(payload):
     ## Assign task to user
@@ -182,31 +218,40 @@ def detectChange(payload):
             return
         ## Update status
         if 'labels' in payload['changes']:
-            print('Change status:')
+            print('Change label:')
+
             current_assignee = 'project.robot'
-            if 'assignees' in payload:
+            if 'assignees' in payload and jira_workarround_enable:
                 current_assignee = payload['assignees'][0]['username']
                 print(current_assignee)
                 changeAssignee(task, 'project.robot')
-            print(current_assignee)
+            
+            for label in payload['changes']['labels']['current']:
+                print(label)
+                if label['title'].startswith(jira_status_prefix):
+                    print(label['title'])
+                elif label['title'].startswith(jira_component_prefix):
+                    print(label['title'])
+                    # task.update(fields={"components": label['title']})
+
             if payload['changes']['labels']['current']:
                 new_label = payload['changes']['labels']['current'][0]['title']
                 task.update(fields={"labels": [new_label]})
                 if new_label in ['Status_Doing', 'Status_Testing']:
-                    changeStatus(task, '11')
-                elif new_label in ['Status_Done-dev', 'Status_Done']:
-                    changeStatus(task, '21')
+                    changeStatus(task, inprogress)
+                elif new_label in ['Status_Done']:
+                    changeStatus(task, complete)
                 elif new_label == 'Status_Canceled':
-                    changeStatus(task, '51')
+                    changeStatus(task, cancel)
                 elif new_label == 'Status_Resolved':
-                    changeStatus(task, '31')
+                    changeStatus(task, resolve)
             else:
                 if payload['changes']['labels']['previous']:
                     print('Reopen')
                     task.update(fields={"labels": ['Status_Reopen']})
-                    changeStatus(task, '71')
+                    changeStatus(task, reopen)
             if current_assignee != 'project.robot':
-                changeAssignee(task, 'huytg13')
+                changeAssignee(task, current_assignee)
         return
     return
 
