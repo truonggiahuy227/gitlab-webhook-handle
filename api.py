@@ -230,26 +230,11 @@ def detectChange(payload):
                 print(label)
                 if label['title'].startswith(jira_status_prefix):
                     print(label['title'])
+                    mapTaskLabel(task, payload)
                 elif label['title'].startswith(jira_component_prefix):
                     print(label['title'])
-                    # task.update(fields={"components": label['title']})
+                    task.update(fields={"components": label['title']})
 
-            if payload['changes']['labels']['current']:
-                new_label = payload['changes']['labels']['current'][0]['title']
-                task.update(fields={"labels": [new_label]})
-                if new_label in ['Status_Doing', 'Status_Testing']:
-                    changeStatus(task, inprogress)
-                elif new_label in ['Status_Done']:
-                    changeStatus(task, complete)
-                elif new_label == 'Status_Canceled':
-                    changeStatus(task, cancel)
-                elif new_label == 'Status_Resolved':
-                    changeStatus(task, resolve)
-            else:
-                if payload['changes']['labels']['previous']:
-                    print('Reopen')
-                    task.update(fields={"labels": ['Status_Reopen']})
-                    changeStatus(task, reopen)
             if current_assignee != 'project.robot':
                 changeAssignee(task, current_assignee)
         return
