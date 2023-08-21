@@ -9,6 +9,7 @@ from datetime import date
 import calendar
 
 
+
 jira_user_name = os.environ.get('JIRA_USERNAME')
 jira_password = os.environ.get('JIRA_PASSWORD')
 jira_server = os.environ.get('JIRA_SERVER')
@@ -65,7 +66,7 @@ def checkTransition(task, id):
             return True
     return False
 
-def createTask(summary, startDate, dueDate):
+def createDefaultTask(summary, startDate, dueDate):
 
     estimate = calculateDate(startDate, dueDate)
     issue_dict = {
@@ -80,8 +81,36 @@ def createTask(summary, startDate, dueDate):
         'duedate': dueDate,
         'customfield_10103': startDate
     }
-    new_issue = auth_jira.create_issue(fields=issue_dict)
-    return new_issue
+    task = auth_jira.create_issue(fields=issue_dict)
+    return task
+
+def createTask(payload):
+    task_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
+    description = payload['object_attributes']['description'] if payload['object_attributes']['description'] else ''
+    estimate = convert(payload['object_attributes']['time_estimate']) if payload['object_attributes']['time_estimate'] > 0 else '1d'
+    
+    startDateString = payload['object_attributes']['created_at'].split(' ')
+    startDate = startDateString[0]
+    dueDate = payload['object_attributes']['due_date']
+
+    issue_dict = {
+        'project': {'key': jira_proj},
+        'summary': task_name,
+        'description': description,
+        'issuetype': {'name': 'Task'},
+        'components': [{
+            "name" :"Front-end"
+            }],
+        'customfield_10306': estimate,
+        'duedate': dueDate,
+        'customfield_10103': startDate
+    }
+    task = auth_jira.create_issue(fields=issue_dict)
+
+    if payload['assignees']:
+        auth_jira.assign_issue(task, payload['assignees'][0]['username'])
+
+    return task
 
 def changeAssignee(issue_name, assignee):
     issue = auth_jira.issue(issue_name)
@@ -100,14 +129,28 @@ def detectChange(payload):
         ## Create new Task
         #print('issue name: ' + payload['object_attributes']['title'] + ', state: ' + payload['object_attributes']['state'])
         print("Create new Task on Jira")
+        task_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
+        print(task_name)
         startDateString = payload['object_attributes']['created_at'].split(' ')
         startDate = startDateString[0]
         dueDate = getLastDayOfMonth(startDate)
-        createTask(payload['object_attributes']['title'], startDate, dueDate)
+
+        createDefaultTask(task_name, startDate, dueDate)
         return
     if payload['object_attributes']['action'] == 'update':
-        task = auth_jira.search_issues('summary~\"'  + payload['object_attributes']['title'] + '\"')[0]
-        #print('summary~\"'  + payload['object_attributes']['title'] + '\"')
+        querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
+        tasks = auth_jira.search_issues('summary~\"'  + querry_str + '\"')
+        task = ''
+        if tasks:
+            task = auth_jira.search_issues('summary~\"'  + querry_str + '\"')[0]
+        else:
+            task = createTask(payload)
+        if 'title' in payload['changes']:
+            new_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
+            task.update(
+                summary=new_name
+            )
+            return
         if "due_date" in payload['changes']:
             print('Update due date')
             startDateString = payload['object_attributes']['created_at'].split(' ')
@@ -123,7 +166,7 @@ def detectChange(payload):
                 print('Change assignee in Task from assignee ' + payload['changes']['assignees']['previous'][0]['username'] + ' to new assignee ' + new_assignee)
             else:
                 print('Assign Task ' + payload['object_attributes']['title'] + ' to assignee ' + new_assignee)
-            changeAssignee(task, 'tungpt18' )
+            changeAssignee(task, new_assignee )
             return
         if 'time_estimate' in payload['changes']:
             print('Update estimate')
@@ -133,9 +176,19 @@ def detectChange(payload):
                 customfield_10306=estimate
             )
             return
+        if 'total_time_spent' in payload['changes']:
+            print('change worklog')
+            auth_jira.add_worklog(task, timeSpent="2h")
+            return
         ## Update status
         if 'labels' in payload['changes']:
             print('Change status:')
+            current_assignee = 'project.robot'
+            if 'assignees' in payload:
+                current_assignee = payload['assignees'][0]['username']
+                print(current_assignee)
+                changeAssignee(task, 'project.robot')
+            print(current_assignee)
             if payload['changes']['labels']['current']:
                 new_label = payload['changes']['labels']['current'][0]['title']
                 task.update(fields={"labels": [new_label]})
@@ -152,8 +205,9 @@ def detectChange(payload):
                     print('Reopen')
                     task.update(fields={"labels": ['Status_Reopen']})
                     changeStatus(task, '71')
+            if current_assignee != 'project.robot':
+                changeAssignee(task, 'huytg13')
         return
-    
     return
 
 
@@ -185,7 +239,6 @@ def home_page():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    print('Receive POST request')
     if request.method == 'POST':
         payload = request.json
         # print(payload['object_kind'])
