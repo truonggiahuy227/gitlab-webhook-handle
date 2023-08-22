@@ -288,7 +288,7 @@ def detectChange(payload):
                 elif label['title'].startswith(jira_component_prefix):
                     print(label['title'])
                     new_component = label['title'].replace(jira_component_prefix, '')
-                    components.append(new_component)
+                    components.append({"name": new_component})
                     task.update(fields={"components": components})
 
             if current_assignee != 'project.robot':
