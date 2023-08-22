@@ -18,6 +18,8 @@ jira_proj = os.environ.get('JIRA_PROJECT')
 jira_status_prefix = os.environ.get('STATUS_PREFIX')
 jira_component_prefix = os.environ.get('COMPONENT_PREFIX')
 jira_workarround_enable = True
+log_path = os.environ.get('LOG_PATH', 'stdout')
+log_level = os.environ.get('LOG_LEVEL', 20)
 
 
 inprogress = '11'
@@ -29,19 +31,26 @@ reopen = '71'
 # inprogress_labels = []
 
 logging.Formatter.converter = time.gmtime
-logging.basicConfig(filename='/tmp/myapp.log', level=logging.DEBUG, 
+
+logging.basicConfig(filename=log_path, level=log_level, 
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
+
 log = logging.getLogger(__name__) 
-if any(v in (None, '') for v in[jira_user_name, jira_password, jira_server, jira_proj]):
+if any(v in (None, '') for v in[jira_user_name, jira_password, jira_server, jira_proj ]):
     log.error("Environment Variables not passed incorrectly")
     raise SystemExit(1)
 
 event_queue = Queue()
 event = []
 app = Flask(__name__)
+
 auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
 ## Function part
+def init():
+
+    JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
+
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
