@@ -28,7 +28,8 @@ reopen = '71'
 # inprogress_labels = []
 
 
-
+logging.basicConfig(filename='/tmp/myapp.log', level=logging.DEBUG, 
+                    format='%(asctime)s %(levelname)s %(name)s %(message)s')
 log = logging.getLogger(__name__) 
 if any(v in (None, '') for v in[jira_user_name, jira_password, jira_server, jira_proj]):
     log.error("Environment Variables not passed incorrectly")
@@ -40,6 +41,11 @@ app = Flask(__name__)
 auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
 ## Function part
+def init():
+    file = open('/tmp/app.log','a+')
+    file.close()
+    return
+
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
@@ -96,7 +102,10 @@ def createDefaultTask(summary, startDate, dueDate):
         'duedate': dueDate,
         'customfield_10103': startDate
     }
-    task = auth_jira.create_issue(fields=issue_dict)
+    try: 
+        task = auth_jira.create_issue(fields=issue_dict)
+    except IOError as e:
+        logging.exception(str(e))
     return task
 
 def createTask(payload):
@@ -137,9 +146,49 @@ def changeAssignee(issue_name, assignee):
 
 def changeStatus(task, transition_id):
     if checkTransition(task, transition_id):  
-        auth_jira.transition_issue(task, transition_id)
+        try:
+            auth_jira.transition_issue(task, transition_id)
+        except IOError as e:
+            logging.error(str(e))
     else:
         print('Invalid trasition')
+
+def syncStatus(payload, task):
+    workflow = [
+        {
+            "id" : "71",
+            "name": "Open",
+            "next": [{
+                "id": "11"
+            }]
+        },
+        {
+            "id" : "11",
+            "name" : "In Progress",
+            "next" : [{
+                "id" : "21"
+            },
+            {
+                "id": "51"
+            }]
+        },
+        {
+            "id" : "21",
+            "name": "Completed",
+            "next": ""
+        },
+        {
+            "id" : "31",
+            "name": "Closed",
+            "next": ""
+        },
+        {
+            "id" : "51",
+            "name": "Cancelled",
+            "next": ""
+        }
+    ]
+    return
 
 def mapTaskLabel(task, payload):
     if payload['changes']['labels']['current']:
