@@ -279,7 +279,7 @@ def detectChange(payload):
                 current_assignee = payload['assignees'][0]['username']
                 print(current_assignee)
                 changeAssignee(task, 'project.robot')
-            
+            components = []
             for label in payload['changes']['labels']['current']:
                 print(label)
                 if label['title'].startswith(jira_status_prefix):
@@ -287,7 +287,9 @@ def detectChange(payload):
                     mapTaskLabel(task, payload)
                 elif label['title'].startswith(jira_component_prefix):
                     print(label['title'])
-                    task.update(fields={"components": label['title']})
+                    new_component = label['title'].replace(jira_component_prefix, '')
+                    components.append(new_component)
+                    task.update(fields={"components": components})
 
             if current_assignee != 'project.robot':
                 changeAssignee(task, current_assignee)
