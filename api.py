@@ -7,6 +7,7 @@ import json
 from waitress import serve
 from datetime import date
 import calendar
+import time
 
 
 
@@ -27,7 +28,7 @@ reopen = '71'
 
 # inprogress_labels = []
 
-
+logging.Formatter.converter = time.gmtime
 logging.basicConfig(filename='/tmp/myapp.log', level=logging.DEBUG, 
                     format='%(asctime)s %(levelname)s %(name)s %(message)s')
 log = logging.getLogger(__name__) 
@@ -41,11 +42,6 @@ app = Flask(__name__)
 auth_jira = JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
 ## Function part
-def init():
-    file = open('/tmp/app.log','a+')
-    file.close()
-    return
-
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
@@ -333,6 +329,5 @@ def webhook():
         abort(400)
 
 if __name__ == '__main__':
-    init()
     print('------Start server------')
     serve(app, host="0.0.0.0", port=8080)
