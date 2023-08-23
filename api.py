@@ -195,12 +195,10 @@ def syncStatus(payload, task):
     ]
     return
 
-def mapTaskLabel(task, payload):
+def mapTaskLabel(task, label):
     transitions = auth_jira.transitions(task)
     print(transitions)
-    if payload['changes']['labels']['current']:
-        new_label = payload['changes']['labels']['current'][0]['title']
-        task.update(fields={"labels": [new_label]})
+    new_label = label['title']
     if new_label in ['Status_Doing', 'Status_Testing']:
         changeStatus(task, inprogress)
     elif new_label in ['Status_Done']:
@@ -209,11 +207,6 @@ def mapTaskLabel(task, payload):
         changeStatus(task, cancel)
     elif new_label == 'Status_Resolved':
         changeStatus(task, resolve)
-    else:
-        if payload['changes']['labels']['previous']:
-            print('Reopen')
-            task.update(fields={"labels": ['Status_Reopen']})
-            changeStatus(task, reopen)
 
 def detectChange(payload):
     ## Assign task to user
@@ -228,6 +221,9 @@ def detectChange(payload):
         dueDate = getLastDayOfMonth(startDate)
 
         createDefaultTask(task_name, startDate, dueDate)
+        return
+    if payload['object_attributes']['action'] == 'closed':
+        changeStatus(task, resolve)
         return
     if payload['object_attributes']['action'] == 'update':
         querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
@@ -282,11 +278,14 @@ def detectChange(payload):
                 print(current_assignee)
                 changeAssignee(task, 'project.robot')
             components = []
+            reopen = True
             for label in payload['changes']['labels']['current']:
                 print(label)
                 if label['title'].startswith(jira_status_prefix):
+                    task.update(fields={"labels": [label['title']]})
                     print(label['title'])
-                    mapTaskLabel(task, payload)
+                    mapTaskLabel(task, label)
+                    reopen = False
                 elif label['title'].startswith(jira_component_prefix):
                     print(label['title'])
                     new_component = label['title'].replace(jira_component_prefix, '')
@@ -294,6 +293,11 @@ def detectChange(payload):
             
             if len(components) > 0:
                 task.update(fields={"components": components})
+            
+            if reopen:
+                print('Reopen')
+                task.update(fields={"labels": ['Status_Reopen']})
+                changeStatus(task, reopen)
 
             if current_assignee != 'project.robot':
                 changeAssignee(task, current_assignee)
