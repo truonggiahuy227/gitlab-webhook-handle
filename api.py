@@ -190,7 +190,7 @@ def changeStatus(task, transition_id):
     else:
         print('Invalid trasition')
 
-def syncStatus(payload):
+def syncStatus(payload, task):
     status = [
         {
             "name": "Open",
@@ -239,9 +239,14 @@ def syncStatus(payload):
                     current_status = 4
 
     path = shortest_path(graph, 1, current_status)
-
+    current_assignee = 'project.robot'
+    changeAssignee(task, 'project.robot')
+    if 'assignees' in payload and jira_workarround_enable:
+        current_assignee = payload['assignees'][0]['username']
     for i in path:
         changeStatus(status[i-1]["id"])
+    if current_assignee != 'project.robot':
+        changeAssignee(task, current_assignee)
     return
 
 def mapTaskLabel(task, label):
@@ -282,7 +287,7 @@ def detectChange(payload):
             task = auth_jira.search_issues('summary~\"'  + querry_str + '\"')[0]
         else:
             task = createTask(payload)
-            syncStatus(payload)
+            syncStatus(payload, task)
         if 'title' in payload['changes']:
             new_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
             task.update(
