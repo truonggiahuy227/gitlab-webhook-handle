@@ -323,6 +323,7 @@ def detectChange(payload):
             print('change worklog')
             auth_jira.add_worklog(task, timeSpent="2h")
             return
+        reopen = True
         ## Update status
         if 'labels' in payload['changes']:
             print('Change label:')
@@ -333,7 +334,6 @@ def detectChange(payload):
                 print(current_assignee)
                 changeAssignee(task, 'project.robot')
             components = []
-            reopen = True
             for label in payload['changes']['labels']['current']:
                 print(label)
                 if label['title'].startswith(jira_status_prefix):
@@ -356,6 +356,12 @@ def detectChange(payload):
 
             if current_assignee != 'project.robot':
                 changeAssignee(task, current_assignee)
+            return
+        if reopen:
+            print('Reopen')
+            task.update(fields={"labels": ['Status_Reopen']})
+            changeStatus(task, reopen)
+
         return
     return
 
