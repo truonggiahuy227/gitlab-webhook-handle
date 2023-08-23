@@ -237,7 +237,7 @@ def syncStatus(payload, task):
                     current_status = 5
                 elif label["title"] == 'Status_Resolved':
                     current_status = 4
-    print("Current status: " + status[current_status])
+
     path = shortest_path(graph, 1, current_status)
     current_assignee = 'project.robot'
     changeAssignee(task, 'project.robot')
