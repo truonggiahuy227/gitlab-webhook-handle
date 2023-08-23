@@ -361,7 +361,6 @@ def detectChange(payload):
             print('Reopen')
             task.update(fields={"labels": ['Status_Reopen']})
             changeStatus(task, reopen)
-
         return
     return
 
