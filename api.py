@@ -222,7 +222,7 @@ def syncStatus(payload, task):
     current_status = 1
     labels = payload["labels"]
 
-    if payload['object_attributes']['action'] == 'closed':
+    if payload['object_attributes']['state'] == 'closed':
         current_status = 4
     else:
         for label in labels:
@@ -276,7 +276,7 @@ def detectChange(payload):
 
         createDefaultTask(task_name, startDate, dueDate)
         return
-    if payload['object_attributes']['action'] == 'closed':
+    if payload['object_attributes']['state'] == 'closed':
         changeStatus(task, resolve)
         return
     if payload['object_attributes']['action'] == 'update':
