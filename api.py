@@ -244,7 +244,7 @@ def syncStatus(payload, task):
     if 'assignees' in payload and jira_workarround_enable:
         current_assignee = payload['assignees'][0]['username']
     for i in path:
-        changeStatus(status[i-1]["id"])
+        changeStatus(task, status[i-1]["id"])
     if current_assignee != 'project.robot':
         changeAssignee(task, current_assignee)
     return
