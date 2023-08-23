@@ -140,7 +140,7 @@ def createTask(payload):
     }
     task = auth_jira.create_issue(fields=issue_dict)
 
-    if payload['assignees']:
+    if len(payload['assignees']) > 0:
         auth_jira.assign_issue(task, payload['assignees'][0]['username'])
 
     return task
@@ -196,6 +196,8 @@ def syncStatus(payload, task):
     return
 
 def mapTaskLabel(task, payload):
+    transitions = auth_jira.transitions(task)
+    print(transitions)
     if payload['changes']['labels']['current']:
         new_label = payload['changes']['labels']['current'][0]['title']
         task.update(fields={"labels": [new_label]})
