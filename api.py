@@ -253,7 +253,9 @@ def mapTaskLabel(task, label):
     transitions = auth_jira.transitions(task)
     print(transitions)
     new_label = label['title']
-    if new_label in ['Status_Doing', 'Status_Testing']:
+    if new_label == 'Status_ToDo':
+        changeStatus(task, reopen)
+    elif new_label in ['Status_Doing', 'Status_Testing']:
         changeStatus(task, inprogress)
     elif new_label in ['Status_Done']:
         changeStatus(task, complete)
@@ -358,9 +360,16 @@ def detectChange(payload):
                 changeAssignee(task, current_assignee)
             return
         if reopen:
+            current_assignee = 'project.robot'
+            if 'assignees' in payload and jira_workarround_enable:
+                current_assignee = payload['assignees'][0]['username']
+                print(current_assignee)
+                changeAssignee(task, 'project.robot')
             print('Reopen')
             task.update(fields={"labels": ['Status_Reopen']})
             changeStatus(task, reopen)
+            if current_assignee != 'project.robot':
+                changeAssignee(task, current_assignee)
         return
     return
 
