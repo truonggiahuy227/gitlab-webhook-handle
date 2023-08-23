@@ -51,6 +51,35 @@ def init():
 
     JIRA(basic_auth=(jira_user_name, jira_password), server=jira_server)
 
+def shortest_path(graph, node1, node2):
+    path_list = [[node1]]
+    path_index = 0
+    # To keep track of previously visited nodes
+    previous_nodes = {node1}
+    if node1 == node2:
+        return path_list[0]
+        
+    while path_index < len(path_list):
+        current_path = path_list[path_index]
+        last_node = current_path[-1]
+        next_nodes = graph[last_node]
+        # Search goal node
+        if node2 in next_nodes:
+            current_path.append(node2)
+            return current_path
+        # Add new paths
+        for next_node in next_nodes:
+            if not next_node in previous_nodes:
+                new_path = current_path[:]
+                new_path.append(next_node)
+                path_list.append(new_path)
+                # To avoid backtracking
+                previous_nodes.add(next_node)
+        # Continue to next path in list
+        path_index += 1
+    # No path is found
+    return []
+
 def handle_issue_event():
     item = event_queue.get()
     print(item['object_kind'])
@@ -124,7 +153,10 @@ def createTask(payload):
     
     startDateString = payload['object_attributes']['created_at'].split(' ')
     startDate = startDateString[0]
-    dueDate = payload['object_attributes']['due_date']
+
+    dueDate = getLastDayOfMonth(startDate)
+    if payload['object_attributes']['due_date']:
+        dueDate = payload['object_attributes']['due_date']
 
     issue_dict = {
         'project': {'key': jira_proj},
@@ -158,41 +190,58 @@ def changeStatus(task, transition_id):
     else:
         print('Invalid trasition')
 
-def syncStatus(payload, task):
-    workflow = [
+def syncStatus(payload):
+    status = [
         {
-            "id" : "71",
             "name": "Open",
-            "next": [{
-                "id": "11"
-            }]
+            "id": "71"
         },
         {
-            "id" : "11",
-            "name" : "In Progress",
-            "next" : [{
-                "id" : "21"
-            },
-            {
-                "id": "51"
-            }]
+            "name": "In Progress",
+            "id": "11"
         },
         {
-            "id" : "21",
-            "name": "Completed",
-            "next": ""
+            "name": "Complete",
+            "id": "21"
         },
         {
-            "id" : "31",
-            "name": "Closed",
-            "next": ""
+            "name": "Close",
+            "id": "31"
         },
         {
-            "id" : "51",
-            "name": "Cancelled",
-            "next": ""
+            "name": "Cancel",
+            "id": "51"
         }
     ]
+    graph = {}
+    graph[1] = {2, 5}
+    graph[2] = {3, 5}
+    graph[3] = {2, 4}
+    graph[4] = {1}
+    graph[5] = {1}
+    current_status = 1
+    labels = payload["labels"]
+
+    if payload['object_attributes']['action'] == 'closed':
+        current_status = 4
+    else:
+        for label in labels:
+            if label["title"].startswith(jira_component_prefix):
+                current_status = 5
+            if label["title"].startswith(jira_status_prefix):
+                if label["title"] in ['Status_Doing', 'Status_Testing']:
+                    current_status = 2
+                elif label["title"] in ['Status_Done']:
+                    current_status = 3
+                elif label["title"] == 'Status_Canceled':
+                    current_status = 5
+                elif label["title"] == 'Status_Resolved':
+                    current_status = 4
+
+    path = shortest_path(graph, 1, current_status)
+
+    for i in path:
+        changeStatus(status[i-1]["id"])
     return
 
 def mapTaskLabel(task, label):
@@ -233,6 +282,7 @@ def detectChange(payload):
             task = auth_jira.search_issues('summary~\"'  + querry_str + '\"')[0]
         else:
             task = createTask(payload)
+            syncStatus(payload)
         if 'title' in payload['changes']:
             new_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
             task.update(
