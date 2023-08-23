@@ -276,9 +276,6 @@ def detectChange(payload):
 
         createDefaultTask(task_name, startDate, dueDate)
         return
-    if payload['object_attributes']['state'] == 'closed':
-        changeStatus(task, resolve)
-        return
     if payload['object_attributes']['action'] == 'update':
         querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
         tasks = auth_jira.search_issues('summary~\"'  + querry_str + '\"')
@@ -288,6 +285,9 @@ def detectChange(payload):
         else:
             task = createTask(payload)
             syncStatus(payload, task)
+        if payload['object_attributes']['state'] == 'closed':
+            changeStatus(task, resolve)
+            return
         if 'title' in payload['changes']:
             new_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
             task.update(
