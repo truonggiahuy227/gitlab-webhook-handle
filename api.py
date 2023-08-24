@@ -323,10 +323,14 @@ def detectChange(payload):
                 customfield_10306=estimate
             )
             return
-        if 'total_time_spent' in payload['changes']:
+        if 'total_time_spent' in payload['changes'] and 'time_change' in payload['changes']:
             print('change worklog')
-            auth_jira.add_worklog(task, timeSpent="2h")
-            return
+            #auth_jira.add_worklog(task, timeSpent="2h")
+            work_log = convert(payload['changes']['time_change']['current'])
+            total_spent = convert(payload['changes']['total_time_spent']['current'])
+            new_comment = payload['assignees'][0]['username'] + ' added ' + work_log + ' of time spent. Total time spent: ' + total_spent
+            comment = auth_jira.add_comment(task, new_comment)
+            return 
         is_reopen = True
         ## Update status
         if 'labels' in payload['changes']:
