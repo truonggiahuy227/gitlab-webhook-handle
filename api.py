@@ -114,6 +114,7 @@ def calculateDate(startDate, dueDate):
 
 def checkTransition(task, id):
     transitions = auth_jira.transitions(task)
+    print(transitions)
     for trans in transitions:
         if trans['id'] == id:
             return True
@@ -252,12 +253,10 @@ def syncStatus(payload, task):
     return
 
 def mapTaskLabel(task, label):
-    transitions = auth_jira.transitions(task)
-    print(transitions)
     new_label = label['title']
     if new_label == 'Status_ToDo':
         changeStatus(task, reopen)
-    elif new_label in ['Status_Doing', 'Status_Testing']:
+    elif new_label in ['Status_Doing', 'Status_Testing', 'Status_Review', 'Status_TestOK', 'Status_Done-dev']:
         changeStatus(task, inprogress)
     elif new_label in ['Status_Done']:
         changeStatus(task, complete)
@@ -273,7 +272,6 @@ def detectChange(payload):
         #print('issue name: ' + payload['object_attributes']['title'] + ', state: ' + payload['object_attributes']['state'])
         print("Create new Task on Jira")
         task_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
-        print(task_name)
         startDateString = payload['object_attributes']['created_at'].split(' ')
         startDate = startDateString[0]
         dueDate = getLastDayOfMonth(startDate)
@@ -368,7 +366,7 @@ def detectChange(payload):
                 changeAssignee(task, current_assignee)
             return
         if is_reopen:
-            print("Lan nay reopen")
+            print("Reopen")
             print(auth_jira.transitions(task))
             task.update(fields={"labels": ['Status_Reopen']})
             changeStatus(task, reopen)
