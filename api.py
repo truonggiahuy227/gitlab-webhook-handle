@@ -119,15 +119,14 @@ def checkTransition(task, id):
             return True
     return False
 
-def createDefaultTask(summary, startDate, dueDate):
+def createDefaultTask(summary, startDate, dueDate, description):
     jra = auth_jira.project(jira_proj)
     components = auth_jira.project_components(jra)
-
     estimate = calculateDate(startDate, dueDate)
     issue_dict = {
         'project': {'key': jira_proj},
         'summary': summary,
-        'description': "",
+        'description': description,
         'issuetype': {'name': 'Task'},
         'components': [{
             "name" : components[0].name
@@ -148,7 +147,7 @@ def createTask(payload):
 
 
     task_name = '[' + payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid']) + '] - ' + payload['object_attributes']['title']
-    description = payload['object_attributes']['description'] if payload['object_attributes']['description'] else ''
+    description = 'Gitlab task ref: ' + payload['object_attributes']['url']
     estimate = convert(payload['object_attributes']['time_estimate']) if payload['object_attributes']['time_estimate'] > 0 else '1d'
     
     startDateString = payload['object_attributes']['created_at'].split(' ')
@@ -178,7 +177,6 @@ def createTask(payload):
             total_spent = payload['object_attributes']['human_total_time_spent']
             new_comment = payload['assignees'][0]['username'] + '\'s total time spent: ' + total_spent
             auth_jira.add_comment(task, new_comment)
-            
     return task
 
 def changeAssignee(issue_name, assignee):
@@ -279,8 +277,8 @@ def detectChange(payload):
         startDateString = payload['object_attributes']['created_at'].split(' ')
         startDate = startDateString[0]
         dueDate = getLastDayOfMonth(startDate)
-
-        createDefaultTask(task_name, startDate, dueDate)
+        description = 'Gitlab task ref: ' + payload['object_attributes']['url']
+        createDefaultTask(task_name, startDate, dueDate, description)
         return
     if payload['object_attributes']['action'] == 'update':
         querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
