@@ -174,7 +174,11 @@ def createTask(payload):
 
     if len(payload['assignees']) > 0:
         auth_jira.assign_issue(task, payload['assignees'][0]['username'])
-
+        if 'human_total_time_spent' in payload['object_attributes']:
+            total_spent = payload['object_attributes']['human_total_time_spent']
+            new_comment = payload['assignees'][0]['username'] + '\'s total time spent: ' + total_spent
+            auth_jira.add_comment(task, new_comment)
+            
     return task
 
 def changeAssignee(issue_name, assignee):
