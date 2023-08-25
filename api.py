@@ -115,6 +115,7 @@ def calculateDate(startDate, dueDate):
 def checkTransition(task, id):
     transitions = auth_jira.transitions(task)
     print(transitions)
+    current_id = ''
     for trans in transitions:
         if trans['id'] == id:
             return True
@@ -278,7 +279,7 @@ def detectChange(payload):
         description = 'Gitlab task ref: ' + payload['object_attributes']['url']
         createDefaultTask(task_name, startDate, dueDate, description)
         return
-    if payload['object_attributes']['action'] == 'update':
+    elif payload['object_attributes']['action'] == 'update':
         querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
         exist_task_name = payload['object_attributes']['title']
         exist_task = auth_jira.search_issues('summary~\"'  + exist_task_name + '\"')
