@@ -281,11 +281,9 @@ def detectChange(payload):
         return
     elif payload['object_attributes']['action'] == 'update':
         querry_str = payload['project']['path_with_namespace'] + '#' + str(payload['object_attributes']['iid'])
-        exist_task_name = payload['object_attributes']['title']
-        exist_task = auth_jira.search_issues('summary~\"'  + exist_task_name + '\"')
         tasks = auth_jira.search_issues('summary~\"'  + querry_str + '\"')
         task = {}
-        if not exist_task:
+        if len(tasks) == 0:
             task = createTask(payload)
             syncStatus(payload, task)
         elif len(tasks) > 0:
