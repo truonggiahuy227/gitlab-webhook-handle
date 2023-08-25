@@ -233,7 +233,7 @@ def syncStatus(payload, task):
             if label["title"].startswith(jira_component_prefix):
                 current_status = 4
             if label["title"].startswith(jira_status_prefix):
-                if label["title"] in ['Status_Doing', 'Status_Testing']:
+                if label["title"] in ['Status_Doing', 'Status_Testing', 'Status_Review', 'Status_TestOK', 'Status_Done-dev']:
                     current_status = 2
                 elif label["title"] in ['Status_Done']:
                     current_status = 3
