@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 event = []
 app = Flask(__name__)
 
+file_path = os.environ.get("EXCEL_PATH", "Project_activity.xlsx")
+
 ## Method part
 
 @app.route('/', methods=['GET'])
@@ -37,7 +39,12 @@ def home_page():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == 'POST':
-        wb = openpyxl.load_workbook('Book1.xlsx')
+        if os.path.exists(file_path):
+            print('The file exists!')
+            wb = openpyxl.load_workbook(file_path)
+        else:
+            print('The file does not exist.')
+            wb = openpyxl.Workbook()
         # sheet = wb.get_sheet_by_name('Sheet1')
         payload = request.json
 
@@ -94,7 +101,7 @@ def webhook():
             else:
                 sheet.append(([str(sheet.max_row - 1), new_commits, 1, 0, date]))
 
-        wb.save('./Book1.xlsx')
+        wb.save(file_path)
         return 'success', 200
     else:
         abort(400)
